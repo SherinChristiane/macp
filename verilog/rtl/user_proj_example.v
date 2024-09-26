@@ -132,22 +132,31 @@ module counter #(
     output reg [BITS-1:0] count
 );
 
+    reg [BITS-1:0] mac_acc_1; // First MAC accumulator
+    reg [BITS-1:0] mac_acc_2; // Second MAC accumulator (parallel)
+
     always @(posedge clk) begin
         if (reset) begin
-            count <= 1'b0;
-            ready <= 1'b0;
+            count <= 1'b0; // Reset count
+            ready <= 1'b0; // Reset ready signal
+            mac_acc_1 <= 1'b0; // Reset first MAC accumulator
+            mac_acc_2 <= 1'b0; // Reset second MAC accumulator
         end else begin
-            ready <= 1'b0;
-            if (~|la_write) begin
-                count <= count + 1'b1;
-            end
+            ready <= 1'b0; // Default to not ready
+            
             if (valid && !ready) begin
-                ready <= 1'b1;
-                rdata <= count;
-                if (wstrb[0]) count[7:0]   <= wdata[7:0];
-                if (wstrb[1]) count[15:8]  <= wdata[15:8];
+                ready <= 1'b1; // Set ready signal
+                rdata <= mac_acc_1 + mac_acc_2; // Output combined result of both accumulators
+                
+                // Perform MAC operation in parallel
+                if (wstrb[0]) begin
+                    mac_acc_1 <= mac_acc_1 + (la_input * wdata[7:0]); // Multiply and accumulate for lower bits
+                end
+                if (wstrb[1]) begin
+                    mac_acc_2 <= mac_acc_2 + (la_input * wdata[15:8]); // Multiply and accumulate for upper bits
+                end
             end else if (|la_write) begin
-                count <= la_write & la_input;
+                count <= la_write & la_input; // Logic analyzer input
             end
         end
     end
